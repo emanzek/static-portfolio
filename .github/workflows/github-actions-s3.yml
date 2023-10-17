@@ -14,7 +14,7 @@ jobs:
             aws_key_id: ${{secrets.AWS_KEY_ID}}
             aws_secret_access_key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
             aws_bucket: emanzek.co
-            source_dir: '.'
+            source_dir: 'static'
             destination_dir: ''
         - name: Status upload
           if: success()
