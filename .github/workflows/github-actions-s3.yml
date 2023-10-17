@@ -1,21 +1,24 @@
 name: GitHub Actions S3
 on: [push]
 jobs:
-  UpdatePortfolio:
-      timeout-minutes: 5
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v2
-        - name: Upload S3    
-          uses: shallwefootball/s3-upload-action@master
-          id: S3
-          with:
-            aws_key_id: ${{secrets.AWS_KEY_ID}}
-            aws_secret_access_key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
-            aws_bucket: emanzek.co
-            source_dir: 'static'
-            destination_dir: ''
-        - name: Status upload
-          if: success()
-          run: echo "Files successfully uploaded!"
+  deploy:
+    name: Upload to Amazon S3
+    runs-on: ubuntu-latest
+    # These permissions are needed to interact with GitHub's OIDC Token endpoint.
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::178903630933:role/github-oidc-Role-MJRDaxXvI7Id
+        aws-region: us-east-1
+    - name: Copy files to the website with the AWS CLI
+      run: |
+        aws s3 sync . s3://emanzek.co
+    - name: Status upload
+      if: success()
+      run: echo "Files successfully uploaded!"
