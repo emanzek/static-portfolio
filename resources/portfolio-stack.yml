@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Creates a private S3 bucket with a block public access policy for hosting a static website.
+
+Parameters:
+  bucketName:
+    Description: Name for static portfolio bucket
+    Type: String
+    Default: static-portfolio
+  domainName:
+    Description: Name for static portfolio domain
+    Type: String
+    Default: emanzek.com
+  acmCertificate:
+    Description: ACM certificate for cloudfront distribution
+    Type: String
+    Default: ''
+
+Resources:
+  publicS3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref bucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+              - HEAD
+            AllowedOrigins:
+              - '*'
+            ExposedHeaders:
+              - Date
+            Id: publicCORSconfig
+            MaxAge: 3600
+
+  publicBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref publicS3Bucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource:
+              Fn::Join:
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref publicS3Bucket
+                  - '/*'
+
+  CloudFrontOriginAccessIdentity:
+    Type: 'AWS::CloudFront::CloudFrontOriginAccessIdentity'
+    DependsOn:
+      - publicBucketPolicy
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: 'static-portfolio-oai'
+
+  cloudfrontDistribution:
+    Type: 'AWS::CloudFront::Distribution'
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Ref domainName
+          - !Join ['.',['www',!Ref domainName]]
+        Origins:
+          - DomainName: !Join 
+                - '.'
+                - - !Ref publicS3Bucket
+                  - s3-website
+                  - !Sub ${AWS::Region}
+                  - amazonaws.com
+            OriginPath: ''
+            Id: S3BucketOrigin
+            CustomOriginConfig:
+              OriginProtocolPolicy: match-viewer
+        Comment: 'CloudFront origin for static portfolio'
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          TargetOriginId: S3BucketOrigin
+          Compress: true
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: allow-all
+        Enabled: 'true'
+        PriceClass: PriceClass_200
+        HttpVersion: 'http2'
+        ViewerCertificate:
+          AcmCertificateArn: !Ref acmCertificate
+          MinimumProtocolVersion: TLSv1.2_2018
+          SslSupportMethod: sni-only

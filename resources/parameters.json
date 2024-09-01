@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "bucketName",
+    "ParameterValue": "emanzek-cf-portfolio"
+  },
+  {
+    "ParameterKey": "domainName",
+    "ParameterValue": "emanzek.xyz"
+  },
+  {
+    "ParameterKey": "acmCertificate",
+    "ParameterValue": "arn:aws:acm:us-east-1:178903630933:certificate/9a1d7b10-deff-4a8b-8210-e57b15817a30"
+  }
+]
