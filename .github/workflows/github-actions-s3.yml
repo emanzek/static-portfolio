@@ -1,8 +1,16 @@
 name: GitHub Actions S3
-on: [push]
+on: 
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+    paths:
+      - 'dist/**/*'
+      - 'resources/**/*'
 jobs:
-  deploy:
-    name: Upload to Amazon S3
+  updateContent:
+    if: ${{ github.event.pull_request.merged && github.event.changes.dist != 'null' }}
+    name: Sync to Amazon S3
     runs-on: ubuntu-latest
     # These permissions are needed to interact with GitHub's OIDC Token endpoint.
     permissions:
@@ -14,11 +22,32 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        role-to-assume: arn:aws:iam::178903630933:role/github-oidc-Role-MJRDaxXvI7Id
-        aws-region: ap-southeast-1
+        role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.AWS_ROLE_NAME }}
+        aws-region: ${{ env.AWS_REGION }}
     - name: Copy files to the website with the AWS CLI
       run: |
-        aws s3 sync . s3://emanzek.co --exclude '.git/*' --exclude '.github/*'
+        aws s3 sync dist/ s3://${{ env.AWS_S3_BUCKET }} --exclude '.git/*' --exclude '.github/*'
     - name: Status upload
       if: success()
-      run: echo "Files successfully uploaded!"
+      run: echo "Files successfully synced!"
+  updateStack:
+    if: ${{ github.event.pull_request.merged && github.event.changes.resources != 'null' }}
+    name: Update the hosting stack
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.AWS_ROLE_NAME }}
+        aws-region: ${{ env.AWS_REGION }}
+    - name: Update cloudformation stack with the AWS CLI
+      run: |
+        aws cloudformation update-stack --template-body file://resources/portfolio-stack.yml --parameters file://resources/parameters.json --stack-name ${{ env.AWS_S3_BUCKET }}
+    - name: Status cloudformation
+      if: success()
+      run: echo "Stack successfully updated!"
